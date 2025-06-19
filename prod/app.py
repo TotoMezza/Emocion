@@ -5,12 +5,20 @@ import torch
 from torchvision import transforms
 from facenet_pytorch import MTCNN
 import pandas as pd
+import os
+import urllib.request
 from model import FERModel  # modelo definido aparte
 
 # Configuración del dispositivo y modelo
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = FERModel()
-model.load_state_dict(torch.load("../dev/modelo_entrenado.pth", map_location=device))
+model_path = "modelo_entrenado.pth"
+url = "https://github.com/TotoMezza/Emocion/blob/main/dev/modelo_entrenado.pth"
+
+if not os.path.exists(model_path):
+    urllib.request.urlretrieve(url, model_path)
+
+model.load_state_dict(torch.load(model_path, map_location=device))
 model.eval().to(device)
 
 # Emociones y colores asociados
