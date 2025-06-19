@@ -10,7 +10,7 @@ from model import FERModel  # modelo definido aparte
 # Configuración del dispositivo y modelo
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = FERModel()
-model.load_state_dict(torch.load("modelo_entrenado.pth", map_location=device))
+model.load_state_dict(torch.load("prod/modelo_entrenado.pth", map_location=device))
 model.eval().to(device)
 
 # Emociones y colores asociados
@@ -71,7 +71,7 @@ if image is not None:
 
         draw = ImageDraw.Draw(image)
         try:
-            font = ImageFont.truetype("arial.ttf", size=22)
+            font = ImageFont.truetype("arial.ttf", size=80)
         except:
             font = ImageFont.load_default()
 
