@@ -15,7 +15,6 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
-# Ya tienes esta versión mejorada en tu código más reciente, úsala:
 class FERModel(nn.Module):
     
     def __init__(self, num_classes=7):
