@@ -13,7 +13,7 @@ from model import FERModel  # modelo definido aparte
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = FERModel()
 model_path = "modelo_entrenado.pth"
-url = "https://github.com/TotoMezza/Emocion/blob/main/dev/modelo_entrenado.pth"
+url = "https://raw.githubusercontent.com/TotoMezza/Emocion/main/dev/modelo_entrenado.pth"
 
 if not os.path.exists(model_path):
     urllib.request.urlretrieve(url, model_path)
