@@ -1,7 +1,10 @@
 streamlit
+streamlit-webrtc
 torch
 torchvision
 facenet-pytorch
+opencv-python-headless
 Pillow
+av
 numpy
 matplotlib
