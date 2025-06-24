@@ -8,3 +8,4 @@ pandas
 numpy
 streamlit-webrtc
 av
+matplotlib
