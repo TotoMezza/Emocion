@@ -36,7 +36,7 @@ transform = transforms.Compose([
 ])
 
 # Detector MTCNN
-mtcnn = MTCNN(keep_all=True, device=device, post_process=True)
+
 
 # Streamlit
 st.title("🎥 Detector de emociones en tiempo real")
