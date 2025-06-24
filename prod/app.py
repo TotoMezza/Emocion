@@ -5,6 +5,7 @@ import torch
 from torchvision import transforms
 from facenet_pytorch import MTCNN
 import pandas as pd
+from streamlit_webrtc import WebRtcMode
 import numpy as np
 import os
 import urllib.request
@@ -147,7 +148,7 @@ RTC_CONFIGURATION = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.goog
 
 webrtc_streamer(
     key="emotion-detection",
-    mode="receive",
+    mode=WebRtcMode.RECVONLY,  # ← Usar el enum correcto
     rtc_configuration=RTC_CONFIGURATION,
     video_processor_factory=EmotionProcessor,
     media_stream_constraints={"video": True, "audio": False},
