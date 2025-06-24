@@ -1,76 +1,119 @@
 # app.py
 import streamlit as st
+from PIL import Image, ImageDraw, ImageFont
 import torch
 from torchvision import transforms
 from facenet_pytorch import MTCNN
-from model import FERModel
-import av
-import numpy as np
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
-import torch.nn.functional as F
-from PIL import Image, ImageDraw
+import pandas as pd
+import os
+import urllib.request
+from model import FERModel  # modelo definido aparte
 
-# Configurar modelo
+# Configuración del dispositivo y modelo
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = FERModel()
-model.load_state_dict(torch.load("modelo_entrenado.pth", map_location=device))
+model_path = "modelo_entrenado.pth"
+url = "https://raw.githubusercontent.com/TotoMezza/Emocion/main/dev/modelo_entrenado.pth"
+
+if not os.path.exists(model_path):
+    urllib.request.urlretrieve(url, model_path)
+
+model.load_state_dict(torch.load(model_path, map_location=device))
 model.eval().to(device)
 
-# Emociones y colores
+# Emociones y colores asociados
 class_names = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 emotion_colors = {
-    'Angry': (230, 57, 70),
-    'Disgust': (106, 153, 78),
-    'Fear': (154, 140, 152),
-    'Happy': (244, 211, 94),
-    'Sad': (69, 123, 157),
-    'Surprise': (249, 132, 74),
-    'Neutral': (168, 167, 167)
+    'Angry': '#E63946',
+    'Disgust': '#6A994E',
+    'Fear': '#9A8C98',
+    'Happy': '#F4D35E',
+    'Sad': '#457B9D',
+    'Surprise': '#F9844A',
+    'Neutral': '#A8A7A7'
 }
 
-# Transformaciones
+# Detector de caras MTCNN
+mtcnn = MTCNN(keep_all=True, device=device, post_process=True)
+
+# Transformaciones para el modelo
 transform = transforms.Compose([
     transforms.Grayscale(num_output_channels=1),
     transforms.Resize((48, 48)),
     transforms.ToTensor()
 ])
 
-# Detector MTCNN
+# Interfaz Streamlit
+st.markdown(
+    """
+    <h1 style='text-align:center; color:#3B4252; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;'>
+        🎭 Detector de emociones faciales 😄😠😢
+    </h1>
+    """, unsafe_allow_html=True)
 
+# Widgets para cargar imagen o sacar foto
+uploaded_file = st.file_uploader("Subí una foto grupal (jpg, jpeg, png)", type=["jpg", "jpeg", "png"])
 
-# Streamlit
-st.title("🎥 Detector de emociones en tiempo real")
+photo = st.camera_input("O tomá una foto con la cámara 📷")
 
-class EmotionDetector(VideoTransformerBase):
-    def transform(self, frame: av.VideoFrame) -> np.ndarray:
-        img = frame.to_ndarray(format="bgr24")
-        pil_img = Image.fromarray(img[:, :, ::-1])  # BGR → RGB
+# Prioridad: si sacaron foto, usarla. Si no, usar imagen subida.
+image = None
+if photo is not None:
+    image = Image.open(photo).convert("RGB")
+elif uploaded_file is not None:
+    image = Image.open(uploaded_file).convert("RGB")
 
-        boxes, _ = mtcnn.detect(pil_img)
-        draw = ImageDraw.Draw(pil_img)
+if image is not None:
+    st.image(image, caption="Imagen original", use_container_width=True)
 
-        if boxes is not None:
-            for box in boxes:
-                face = pil_img.crop(box).convert("L").resize((48, 48))
-                input_tensor = transform(face).unsqueeze(0).to(device)
+    boxes, _ = mtcnn.detect(image)
 
-                with torch.no_grad():
-                    output = model(input_tensor)
-                    probs = F.softmax(output, dim=1)[0]
-                    pred = torch.argmax(probs).item()
-                    emotion = class_names[pred]
-                    confidence = float(probs[pred]) * 100
+    if boxes is None:
+        st.warning("No se detectaron caras. 🤔 Intentá con otra foto.")
+    else:
+        # Ordenar cajas de izquierda a derecha para alinear con la tabla
+        idx_sort = boxes[:, 0].argsort()
+        boxes = boxes[idx_sort]
 
-                color = emotion_colors[emotion]
-                draw.rectangle(box.tolist(), outline=color, width=3)
-                draw.text((box[0], box[1] - 10), f"{emotion} ({confidence:.1f}%)", fill=color)
+        st.success(f"Se detectaron {len(boxes)} cara(s) 👀")
 
-        return np.array(pil_img)
+        draw = ImageDraw.Draw(image)
+        try:
+            font = ImageFont.truetype("arial.ttf", size=80)
+        except:
+            font = ImageFont.load_default()
 
-# Mostrar webcam en Streamlit
-webrtc_streamer(
-    key="emotion-detection",
-    video_transformer_factory=EmotionDetector,
-    media_stream_constraints={"video": True, "audio": False},
-    async_transform=True
-)
+        resultados = []
+
+        for i, box in enumerate(boxes):
+            face = image.crop(box).convert("L").resize((48, 48))
+            input_tensor = transform(face).unsqueeze(0).to(device)
+
+            with torch.no_grad():
+                output = model(input_tensor)
+                probs = torch.nn.functional.softmax(output, dim=1)[0]
+                pred = torch.argmax(probs).item()
+                emotion = class_names[pred]
+                topk = torch.topk(probs, 3)
+                top_emotions = [(class_names[idx], float(p) * 100) for idx, p in zip(topk.indices, topk.values)]
+
+            color = emotion_colors.get(emotion, "red")
+
+            # Dibujar caja con borde ancho
+            draw.rectangle(box.tolist(), outline=color, width=5)
+            etiqueta = f"Persona #{i+1}: {emotion} ({top_emotions[0][1]:.1f}%)"
+            draw.text((box[0], box[1] - 30), etiqueta, fill=color, font=font)
+
+            resultados.append((i+1, emotion, color, top_emotions))
+
+        st.image(image, caption="Emociones detectadas 🎉", use_container_width=True)
+
+        st.markdown("## Resultados detallados por persona")
+        for persona_num, emocion_pred, color, emociones_top in resultados:
+            st.markdown(f"### 🧠 Persona #{persona_num}: <span style='color:{color};'>{emocion_pred}</span>", unsafe_allow_html=True)
+            df_emociones = pd.DataFrame(emociones_top, columns=["Emoción", "Confianza (%)"])
+            df_emociones["Confianza (%)"] = df_emociones["Confianza (%)"].map(lambda x: f"{x:.1f}%")
+            st.table(df_emociones)
+
+st.markdown("---")
+st.markdown("<p style='text-align:center; color:gray;'>💡 Pro tip: ¡Sonreí para que te detecte 'Happy'! 😄</p>", unsafe_allow_html=True)
